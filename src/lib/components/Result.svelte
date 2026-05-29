@@ -61,7 +61,7 @@
 
       <!-- 排行 -->
       <div class="section">
-        <h3>最接近排行</h3>
+        <h3>与你的距离</h3>
         {#each result.rankings as r, i}
           <div class="rank" class:first={i === 0}>
             <span class="rnum">#{i + 1}</span>

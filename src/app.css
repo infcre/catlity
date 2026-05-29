@@ -1,0 +1,48 @@
+:root {
+  --color-primary: #FF9D76;
+  --color-primary-light: #FFD4BC;
+  --color-primary-lighter: #FFF0E8;
+  --color-primary-dark: #E87E56;
+  --color-pink: #FFD6E0;
+  --color-bg: #FFF8F0;
+  --color-bg-card: #FFFFFF;
+  --color-bg-bar: #F0E8E0;
+  --color-text: #3D3228;
+  --color-text-secondary: #9B8B7B;
+  --color-shadow: rgba(255, 157, 118, 0.15);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  /* 几何极简背景：柔和的渐变色块 */
+  background-image:
+    radial-gradient(ellipse at 15% 80%, rgba(255, 157, 118, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 15%, rgba(255, 214, 224, 0.14) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 212, 188, 0.07) 0%, transparent 60%),
+    radial-gradient(circle at 70% 70%, rgba(255, 157, 118, 0.06) 0%, transparent 40%);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary-light);
+  border-radius: 3px;
+}

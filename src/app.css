@@ -1,48 +1,74 @@
 :root {
-  --color-primary: #FF9D76;
-  --color-primary-light: #FFD4BC;
-  --color-primary-lighter: #FFF0E8;
-  --color-primary-dark: #E87E56;
-  --color-pink: #FFD6E0;
-  --color-bg: #FFF8F0;
-  --color-bg-card: #FFFFFF;
-  --color-bg-bar: #F0E8E0;
-  --color-text: #3D3228;
-  --color-text-secondary: #9B8B7B;
-  --color-shadow: rgba(255, 157, 118, 0.15);
+	--color-primary: #ff9d76;
+	--color-primary-light: #ffd4bc;
+	--color-primary-lighter: #fff0e8;
+	--color-primary-dark: #e87e56;
+	--color-pink: #ffd6e0;
+	--color-bg: #fff8f0;
+	--color-bg-card: #ffffff;
+	--color-bg-bar: #f0e8e0;
+	--color-text: #3d3228;
+	--color-text-secondary: #9b8b7b;
+	--color-shadow: rgba(255, 157, 118, 0.15);
+	color-scheme: light;
+}
+
+/* 🌙 暗色模式 */
+:root[data-theme='dark'] {
+	--color-primary: #ff9d76;
+	--color-primary-light: #8a5a43;
+	--color-primary-lighter: #3a2a20;
+	--color-primary-dark: #ffb594;
+	--color-pink: #6b4450;
+	--color-bg: #1b1510;
+	--color-bg-card: #272019;
+	--color-bg-bar: #3a322a;
+	--color-text: #f2e9df;
+	--color-text-secondary: #a89a8b;
+	--color-shadow: rgba(0, 0, 0, 0.45);
+	color-scheme: dark;
 }
 
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  min-height: 100vh;
-  /* 几何极简背景：柔和的渐变色块 */
-  background-image:
-    radial-gradient(ellipse at 15% 80%, rgba(255, 157, 118, 0.10) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 15%, rgba(255, 214, 224, 0.14) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(255, 212, 188, 0.07) 0%, transparent 60%),
-    radial-gradient(circle at 70% 70%, rgba(255, 157, 118, 0.06) 0%, transparent 40%);
+	font-family:
+		-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+		sans-serif;
+	background-color: var(--color-bg);
+	color: var(--color-text);
+	min-height: 100vh;
+	/* 几何极简背景：柔和的渐变色块 */
+	background-image:
+		radial-gradient(ellipse at 15% 80%, rgba(255, 157, 118, 0.1) 0%, transparent 50%),
+		radial-gradient(ellipse at 85% 15%, rgba(255, 214, 224, 0.14) 0%, transparent 50%),
+		radial-gradient(ellipse at 50% 50%, rgba(255, 212, 188, 0.07) 0%, transparent 60%),
+		radial-gradient(circle at 70% 70%, rgba(255, 157, 118, 0.06) 0%, transparent 40%);
+}
+
+/* 暗色模式下背景渐变稍微加深 */
+:root[data-theme='dark'] body {
+	background-image:
+		radial-gradient(ellipse at 15% 80%, rgba(255, 157, 118, 0.07) 0%, transparent 50%),
+		radial-gradient(ellipse at 85% 15%, rgba(255, 214, 224, 0.07) 0%, transparent 50%),
+		radial-gradient(ellipse at 50% 50%, rgba(255, 212, 188, 0.04) 0%, transparent 60%);
 }
 
 button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  outline: none;
+	font-family: inherit;
+	cursor: pointer;
+	border: none;
+	outline: none;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
+	width: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-primary-light);
-  border-radius: 3px;
+	background: var(--color-primary-light);
+	border-radius: 3px;
 }

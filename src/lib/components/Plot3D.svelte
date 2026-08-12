@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 
-	let { user, character } = $props();
+	let { user, characters } = $props();
 
 	let canvas;
 	let ready = false;
@@ -164,13 +164,15 @@
 		ctx.fillStyle = '#ccc';
 		ctx.fill();
 
-		// 垂线 + 垂足
+		// 垂线 + 垂足(只给用户和第 1 名,避免太乱)
 		const u = proj(user.x, user.y, user.z);
-		const c = proj(character.x, character.y, character.z);
+		const pts = characters.map((ch) => ({ ...ch, p: proj(ch.x, ch.y, ch.z) }));
 		drawGuides(ctx, u, [user.x, user.y, user.z], 'rgba(255,157,118,0.25)');
-		drawGuides(ctx, c, [character.x, character.y, character.z], 'rgba(220,170,180,0.28)');
+		if (pts[0]) {
+			drawGuides(ctx, pts[0].p, [pts[0].x, pts[0].y, pts[0].z], 'rgba(220,170,180,0.28)');
+		}
 
-		// 数据点
+		// 数据点:你(橙) + 前 3 名猫娘(粉/绿/黄)
 		ctx.beginPath();
 		ctx.arc(u.x, u.y, 8, 0, Math.PI * 2);
 		ctx.fillStyle = '#FF9D76';
@@ -179,21 +181,32 @@
 		ctx.lineWidth = 2.5;
 		ctx.stroke();
 
-		ctx.beginPath();
-		ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
-		ctx.fillStyle = '#FFD6E0';
-		ctx.fill();
-		ctx.strokeStyle = '#fff';
-		ctx.lineWidth = 2.5;
-		ctx.stroke();
+		const POINT_STYLE = [
+			{ fill: '#FFD6E0', label: '#B87080' },
+			{ fill: '#B8E6B8', label: '#4E8A5E' },
+			{ fill: '#FFE9A8', label: '#9C7A2E' }
+		];
+		pts.forEach((pt, i) => {
+			const st = POINT_STYLE[i % POINT_STYLE.length];
+			ctx.beginPath();
+			ctx.arc(pt.p.x, pt.p.y, 8, 0, Math.PI * 2);
+			ctx.fillStyle = st.fill;
+			ctx.fill();
+			ctx.strokeStyle = '#fff';
+			ctx.lineWidth = 2.5;
+			ctx.stroke();
+		});
 
 		// 点标签
 		ctx.font = 'bold 12px -apple-system, sans-serif';
 		ctx.textAlign = 'center';
 		ctx.fillStyle = '#D4734E';
 		ctx.fillText('你', u.x, u.y - 16);
-		ctx.fillStyle = '#B87080';
-		ctx.fillText(character.name, c.x, c.y - 16);
+		pts.forEach((pt, i) => {
+			const st = POINT_STYLE[i % POINT_STYLE.length];
+			ctx.fillStyle = st.label;
+			ctx.fillText(pt.name, pt.p.x, pt.p.y - 16);
+		});
 	}
 
 	onMount(() => {
@@ -235,7 +248,7 @@
 
 	$effect(() => {
 		user;
-		character;
+		characters;
 		az;
 		el;
 		if (ready) draw();

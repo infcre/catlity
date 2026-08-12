@@ -1,141 +1,275 @@
 <script>
-  import { onMount } from 'svelte';
+	import { onMount } from 'svelte';
 
-  let { user, character } = $props();
+	let { user, character } = $props();
 
-  let canvas;
-  let ready = false;
-  const W = 340, H = 280, DPR = 2;
-  const RY = 0.6, RX = -0.5;
+	let canvas;
+	let ready = false;
+	const W = 340,
+		H = 280,
+		DPR = 2;
 
-  function proj(px, py, pz) {
-    const x = (px - 50) / 50;
-    const y = (py - 50) / 50;
-    const z = (pz - 50) / 50;
+	// ✅ 交互式视角：az = 绕 Z 轴旋转，el = 仰角
+	// 初始值沿用原来的 (0.6, 0.5)，之后可拖拽旋转、双击复位
+	let az = $state(0.6);
+	let el = $state(0.5);
+	let dragging = $state(false);
 
-    const x1 = x * Math.cos(RY) + z * Math.sin(RY);
-    const z1 = -x * Math.sin(RY) + z * Math.cos(RY);
-    const y1 = y * Math.cos(RX) - z1 * Math.sin(RX);
-    const z2 = y * Math.sin(RX) + z1 * Math.cos(RX);
+	// 仰角限制在 5°~83°，避免平视退化或完全俯视
+	const EL_MIN = 0.09,
+		EL_MAX = 1.45;
+	const DRAG_K = 0.008; // 拖拽灵敏度 rad/px
 
-    const S = Math.min(W, H) * 0.33;
-    return { x: W / 2 + x1 * S, y: H / 2 - y1 * S, z: z2 };
-  }
+	let lastX = 0,
+		lastY = 0;
 
-  // 正方体 8 个角
-  const V = [
-    [0,0,0],     [100,0,0],   [0,100,0],   [0,0,100],
-    [100,100,0], [100,0,100], [0,100,100], [100,100,100]
-  ];
+	function proj(px, py, pz) {
+		const CAZ = Math.cos(az),
+			SAZ = Math.sin(az);
+		const CEL = Math.cos(el),
+			SEL = Math.sin(el);
+		const x = px / 50,
+			y = py / 50,
+			z = pz / 50;
 
-  // 正方体 12 条棱
-  const CUBE_EDGES = [
-    [0,1],[0,2],[0,3],
-    [1,4],[1,5],[2,4],[2,6],[3,5],[3,6],
-    [4,7],[5,7],[6,7]
-  ];
+		// 绕 Z 轴旋转（水平转视角）
+		const x1 = x * CAZ - y * SAZ;
+		const y1 = x * SAZ + y * CAZ;
 
-  // ✅ 三条主轴：穿过中心 (50,50,50)，从一面中心到对面中心
-  const AXES = [
-    { from: [0,50,50],   to: [100,50,50],  color:'#FF9D76', la:'I 内向',  lb:'E 外向' },
-    { from: [50,0,50],   to: [50,100,50],  color:'#FFB5C2', la:'NT 理性', lb:'SF 感性' },
-    { from: [50,50,0],   to: [50,50,100],  color:'#A8D8EA', la:'P 随性',  lb:'J 计划'  }
-  ];
+		// 投影：x1→屏幕X，z(上) 和 y1(纵深) 组合→屏幕Y
+		const sx = x1;
+		const sy = z * CEL - y1 * SEL;
+		const depth = z * SEL + y1 * CEL;
 
-  function draw() {
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.lineCap = 'round';
+		const S = Math.min(W, H) * 0.27;
+		return { x: W / 2 + sx * S, y: H / 2 - sy * S, z: depth };
+	}
 
-    // 投影所有角
-    const pv = V.map(v => proj(v[0], v[1], v[2]));
+	function seg(ctx, a, b) {
+		ctx.beginPath();
+		ctx.moveTo(a.x, a.y);
+		ctx.lineTo(b.x, b.y);
+		ctx.stroke();
+	}
 
-    // ── 正方体棱线（浅色参考框架）──
-    for (const [i, j] of CUBE_EDGES) {
-      const a = pv[i], b = pv[j];
-      const avgZ = (a.z + b.z) / 2;
-      const t = (avgZ + 1) / 2;
-      ctx.strokeStyle = `rgba(180,170,160,${0.08 + t * 0.2})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-    }
+	// ✅ 立方体 ±50
+	const V = [
+		[-50, -50, -50],
+		[50, -50, -50],
+		[-50, 50, -50],
+		[-50, -50, 50],
+		[50, 50, -50],
+		[50, -50, 50],
+		[-50, 50, 50],
+		[50, 50, 50]
+	];
+	const CE = [
+		[0, 1],
+		[0, 2],
+		[0, 3],
+		[1, 4],
+		[1, 5],
+		[2, 4],
+		[2, 6],
+		[3, 5],
+		[3, 6],
+		[4, 7],
+		[5, 7],
+		[6, 7]
+	];
 
-    // ── 三条主轴（穿过中心）──
-    const center = proj(50, 50, 50);
-    for (const ax of AXES) {
-      const pa = proj(...ax.from);
-      const pb = proj(...ax.to);
+	// ✅ 主轴穿过原点 (0,0,0)
+	const AXES = [
+		{ from: [-50, 0, 0], to: [50, 0, 0], color: '#FF9D76', la: 'I 内向', lb: 'E 外向' },
+		{ from: [0, -50, 0], to: [0, 50, 0], color: '#FFB5C2', la: 'NT 理性', lb: 'SF 感性' },
+		{ from: [0, 0, -50], to: [0, 0, 50], color: '#A8D8EA', la: 'P 随性', lb: 'J 计划' }
+	];
 
-      ctx.strokeStyle = ax.color;
-      ctx.lineWidth = 2.5;
-      ctx.globalAlpha = 0.85;
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-      ctx.globalAlpha = 1;
+	// ✅ 只对 XY 平面 (Z=0) 作垂线
+	function drawGuides(ctx, ptScreen, raw, color) {
+		const [px, py] = raw;
+		const o = proj(0, 0, 0);
+		const foot = proj(px, py, 0);
 
-      // 端点圆
-      for (const p of [pa, pb]) {
-        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = ax.color; ctx.fill();
-      }
+		ctx.strokeStyle = color;
+		ctx.lineWidth = 1;
+		ctx.setLineDash([4, 4]);
+		seg(ctx, ptScreen, foot); // 垂线：点 → XY平面
+		seg(ctx, foot, o); // 垂足 → 原点
+		ctx.setLineDash([]);
 
-      // 标签（沿轴方向外推）
-      ctx.font = 'bold 11px -apple-system, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = ax.color;
-      const off = 20;
-      for (const [p, txt] of [[pa, ax.la], [pb, ax.lb]]) {
-        const dx = p.x - center.x, dy = p.y - center.y;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        ctx.fillText(txt, p.x + (dx / len) * off, p.y + (dy / len) * off);
-      }
-    }
+		ctx.beginPath();
+		ctx.arc(foot.x, foot.y, 2.5, 0, Math.PI * 2);
+		ctx.fillStyle = color;
+		ctx.fill();
+	}
 
-    // ── 中心点 ──
-    ctx.beginPath(); ctx.arc(center.x, center.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#ccc'; ctx.fill();
+	function draw() {
+		if (!canvas) return;
+		const ctx = canvas.getContext('2d');
+		ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+		ctx.clearRect(0, 0, W, H);
+		ctx.lineCap = 'round';
 
-    // ── 数据点 ──
-    const u = proj(user.x, user.y, user.z);
-    const c = proj(character.x, character.y, character.z);
+		const pv = V.map((v) => proj(v[0], v[1], v[2]));
+		const maxZ = Math.max(...pv.map((p) => Math.abs(p.z))) || 1;
 
-    ctx.setLineDash([5, 5]); ctx.lineWidth = 1.2;
-    ctx.strokeStyle = 'rgba(255,157,118,0.4)';
-    ctx.beginPath(); ctx.moveTo(center.x, center.y); ctx.lineTo(u.x, u.y); ctx.stroke();
-    ctx.strokeStyle = 'rgba(220,170,180,0.45)';
-    ctx.beginPath(); ctx.moveTo(center.x, center.y); ctx.lineTo(c.x, c.y); ctx.stroke();
-    ctx.setLineDash([]);
+		// 正方体棱线（近亮远淡）
+		for (const [i, j] of CE) {
+			const a = pv[i],
+				b = pv[j];
+			const t = ((a.z + b.z) / 2 / maxZ + 1) / 2;
+			ctx.strokeStyle = `rgba(180,170,160,${(0.06 + t * 0.22).toFixed(2)})`;
+			ctx.lineWidth = 1;
+			seg(ctx, a, b);
+		}
 
-    // 用户点
-    ctx.beginPath(); ctx.arc(u.x, u.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#FF9D76'; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+		// 主轴 + 标签
+		const center = proj(0, 0, 0);
+		for (const ax of AXES) {
+			const pa = proj(...ax.from),
+				pb = proj(...ax.to);
+			ctx.strokeStyle = ax.color;
+			ctx.lineWidth = 2.5;
+			ctx.globalAlpha = 0.85;
+			seg(ctx, pa, pb);
+			ctx.globalAlpha = 1;
 
-    // 角色点
-    ctx.beginPath(); ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFD6E0'; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+			for (const p of [pa, pb]) {
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+				ctx.fillStyle = ax.color;
+				ctx.fill();
+			}
 
-    // 点标签
-    ctx.font = 'bold 12px -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#D4734E'; ctx.fillText('你', u.x, u.y - 16);
-    ctx.fillStyle = '#B87080'; ctx.fillText(character.name, c.x, c.y - 16);
-  }
+			ctx.font = 'bold 11px -apple-system, sans-serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillStyle = ax.color;
+			const off = 20;
+			for (const [p, txt] of [
+				[pa, ax.la],
+				[pb, ax.lb]
+			]) {
+				const dx = p.x - center.x,
+					dy = p.y - center.y;
+				const len = Math.sqrt(dx * dx + dy * dy) || 1;
+				ctx.fillText(txt, p.x + (dx / len) * off, p.y + (dy / len) * off);
+			}
+		}
 
-  onMount(() => {
-    canvas.width = W * DPR;
-    canvas.height = H * DPR;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ready = true;
-    draw();
-  });
+		// 原点
+		ctx.beginPath();
+		ctx.arc(center.x, center.y, 4, 0, Math.PI * 2);
+		ctx.fillStyle = '#ccc';
+		ctx.fill();
 
-  $effect(() => {
-    user; character;
-    if (ready) draw();
-  });
+		// 垂线 + 垂足
+		const u = proj(user.x, user.y, user.z);
+		const c = proj(character.x, character.y, character.z);
+		drawGuides(ctx, u, [user.x, user.y, user.z], 'rgba(255,157,118,0.25)');
+		drawGuides(ctx, c, [character.x, character.y, character.z], 'rgba(220,170,180,0.28)');
+
+		// 数据点
+		ctx.beginPath();
+		ctx.arc(u.x, u.y, 8, 0, Math.PI * 2);
+		ctx.fillStyle = '#FF9D76';
+		ctx.fill();
+		ctx.strokeStyle = '#fff';
+		ctx.lineWidth = 2.5;
+		ctx.stroke();
+
+		ctx.beginPath();
+		ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
+		ctx.fillStyle = '#FFD6E0';
+		ctx.fill();
+		ctx.strokeStyle = '#fff';
+		ctx.lineWidth = 2.5;
+		ctx.stroke();
+
+		// 点标签
+		ctx.font = 'bold 12px -apple-system, sans-serif';
+		ctx.textAlign = 'center';
+		ctx.fillStyle = '#D4734E';
+		ctx.fillText('你', u.x, u.y - 16);
+		ctx.fillStyle = '#B87080';
+		ctx.fillText(character.name, c.x, c.y - 16);
+	}
+
+	onMount(() => {
+		canvas.width = W * DPR;
+		canvas.height = H * DPR;
+		canvas.style.width = `${W}px`;
+		canvas.style.height = `${H}px`;
+		ready = true;
+		draw();
+	});
+
+	// ─── 拖拽旋转 ───
+	function onPointerDown(e) {
+		dragging = true;
+		lastX = e.clientX;
+		lastY = e.clientY;
+		canvas.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	}
+
+	function onPointerMove(e) {
+		if (!dragging) return;
+		const dx = e.clientX - lastX;
+		const dy = e.clientY - lastY;
+		lastX = e.clientX;
+		lastY = e.clientY;
+		az += dx * DRAG_K;
+		el = Math.min(EL_MAX, Math.max(EL_MIN, el - dy * DRAG_K));
+	}
+
+	function onPointerUp() {
+		dragging = false;
+	}
+
+	function onDoubleClick() {
+		az = 0.6;
+		el = 0.5;
+	}
+
+	$effect(() => {
+		user;
+		character;
+		az;
+		el;
+		if (ready) draw();
+	});
 </script>
 
-<canvas bind:this={canvas}></canvas>
+<div class="plot-box">
+	<canvas
+		bind:this={canvas}
+		onpointerdown={onPointerDown}
+		onpointermove={onPointerMove}
+		onpointerup={onPointerUp}
+		onpointercancel={onPointerUp}
+		ondblclick={onDoubleClick}
+		class:dragging
+	></canvas>
+	<div class="hint">🖱 拖拽旋转 · 双击复位</div>
+</div>
+
+<style>
+	canvas {
+		display: block;
+		margin: 0 auto;
+		touch-action: none; /* 触屏拖拽时不触发页面滚动 */
+		cursor: grab;
+	}
+	canvas.dragging {
+		cursor: grabbing;
+	}
+	.hint {
+		text-align: center;
+		font-size: 0.72rem;
+		color: var(--color-text-secondary);
+		margin-top: 0.35rem;
+		user-select: none;
+	}
+</style>
